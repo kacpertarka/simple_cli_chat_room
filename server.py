@@ -3,6 +3,7 @@ import threading
 import sys
 
 from server_info import ServerInfo
+from validators import name_validate
 
 
 class Server:
@@ -31,6 +32,10 @@ class Server:
                     index = self.__client_socket_list.index(client)
                     name = self.__client_name_list[index]
                     print(f"Message has not been sent to {name}!!\n\n")
+        
+        for cl in self.__client_name_list:
+            print(cl)
+        
         if flag: print("INFO: Message has been sent to all clients!\n\n")
       
         
@@ -74,41 +79,48 @@ class Server:
         """Receive message from clients and then forward them to broadcast function"""
         # get client info
         index = self.__client_socket_list.index(client)
-        name = self.__client_name_list[index]
+        sender = self.__client_name_list[index]
         while True:
             try:
                 # receive single message
                 message = client.recv(ServerInfo.BYTESIZE).decode(ServerInfo.ENCODER)
-                # TODO valiede message about options!! 
-                # OPTIONS: #[name] - send message to specific client,
+                # TODO  options!! 
+                # OPTIONS:
+                # #[name] - send message to specific client,
+                # #[list] - print lists of users
+                # #[color <color>] - change color of messages (class for user?)
                 # soon :D
-                message = f"{name}: {message}"
-                self.__broadcast(message, client)    
+                single, name = name_validate(message, self.__client_name_list) 
+                if single:
+                    self.__private(name, message, sender)
+                else:
+                    message = f"{sender}: {message}"
+                    self.__broadcast(message, client)    
             except socket.error:
                 # something is no yes :D :D
-                message = f"Unfortunately {name} has been thrown out from the room!!"
+                message = f"Unfortunately {sender} has been thrown out from the room!!"
                 self.__broadcast(message, client)
                 
                 # remove client from client lists
-                self.__client_name_list.remove(name)
+                self.__client_name_list.remove(sender)
                 self.__client_socket_list.remove(client)
                 
                 client.close()    
                 break            
       
         
-    def __single_message(self, client_dest: str, message: str, sender: socket.socket | str = "admin" ) -> None:
+    def __private(self, client_name: str, message: str, sender: str = "admin" ) -> None:
         """Send message to single client"""
         if sender == "admin":
             """Message send if error with sending single message by client"""
             pass
         else:
             """Message from one client to other"""
-            index = self.__client_name_list.index(client_dest)
+            index = self.__client_name_list.index(client_name)
             client = self.__client_socket_list[index]
-            index_sen = self.__client_socket_list.index(sender)
-            sender_name = self.__client_name_list[index_sen]
-            message = f"[{sender_name}]: {message}".encode(ServerInfo.ENCODER)
+            # delete  #[name] from message
+            message = message[message.index(']'):] 
+            message = f"[{sender} sent]: {message}".encode(ServerInfo.ENCODER)
             client.send(message)
         
         
