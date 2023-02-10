@@ -18,20 +18,23 @@ class Server:
         self.__client_name_list = []
         self.__client_socket_list = []
         
-    def __broadcast(self, message: str) -> None:
+        
+    def __broadcast(self, message: str, sender: socket.socket = None) -> None:
         """Send message to all clients"""
         flag = True
         for client in self.__client_socket_list:
-            try:
-                client.send(message.encode(ServerInfo.ENCODER))
-            except socket.error:
-                flag = False
-                index = self.__client_socket_list.index(client)
-                name = self.__client_name_list[index]
-                print(f"Message has not been sent to {name}!!\n\n")
+            if client != sender:
+                try:
+                    client.send(message.encode(ServerInfo.ENCODER))
+                except socket.error:
+                    flag = False
+                    index = self.__client_socket_list.index(client)
+                    name = self.__client_name_list[index]
+                    print(f"Message has not been sent to {name}!!\n\n")
         if flag: print("INFO: Message has been sent to all clients!\n\n")
+      
         
-    def __connect_new_client(self) -> None:
+    def __connect(self) -> None:
         """Connect new client and check if room is full"""
         while True:
             client, _ = self.__server.accept()
@@ -63,10 +66,11 @@ class Server:
                 self.__broadcast(f"{client_name} has joined the chat")
                 
                 # start new thread for receive messages for every new client
-                client_thred = threading.Thread(target=self.__receive_message, args=(client,))
+                client_thred = threading.Thread(target=self.__receive, args=(client,))
                 client_thred.start()
+            
                 
-    def __receive_message(self, client: socket.socket) -> None:
+    def __receive(self, client: socket.socket) -> None:
         """Receive message from clients and then forward them to broadcast function"""
         # get client info
         index = self.__client_socket_list.index(client)
@@ -74,13 +78,16 @@ class Server:
         while True:
             try:
                 # receive single message
-                message = client.rcv(ServerInfo.BYTESIZE).decode(ServerInfo.ENCODER)
+                message = client.recv(ServerInfo.BYTESIZE).decode(ServerInfo.ENCODER)
+                # TODO valiede message about options!! 
+                # OPTIONS: #[name] - send message to specific client,
+                # soon :D
                 message = f"{name}: {message}"
-                self.__broadcast(message)    
-            except:
+                self.__broadcast(message, client)    
+            except socket.error:
                 # something is no yes :D :D
                 message = f"Unfortunately {name} has been thrown out from the room!!"
-                self.__broadcast(message)
+                self.__broadcast(message, client)
                 
                 # remove client from client lists
                 self.__client_name_list.remove(name)
@@ -88,6 +95,7 @@ class Server:
                 
                 client.close()    
                 break            
+      
         
     def __single_message(self, client_dest: str, message: str, sender: socket.socket | str = "admin" ) -> None:
         """Send message to single client"""
@@ -103,10 +111,11 @@ class Server:
             message = f"[{sender_name}]: {message}".encode(ServerInfo.ENCODER)
             client.send(message)
         
+        
     def run(self):
         """Start the server"""
         print("Server is starting...\n\n")
-        self.__connect_new_client()
+        self.__connect()
         
 
 def main() -> None:
